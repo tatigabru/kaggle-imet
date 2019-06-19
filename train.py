@@ -51,7 +51,7 @@ def main():
     arg('--criterion', type=str, default='bce', help='Criterion')
     arg('--optimizer', default='Adam', help='Name of the optimizer')    
     arg('--continue_train', type=bool, default=False)   
-    arg('--checkpoint', type=str, default=Path('../results'), help='Checkpoint file path')
+    arg('--checkpoint', type=str, default=Path('../results'), help='Checkpoints root path')
     arg('--workers', type=int, default=2)   
     arg('--debug', type=bool, default=True)
     args = parser.parse_args() 
