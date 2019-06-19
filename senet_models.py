@@ -4,9 +4,9 @@ Created on Wed Jun  5 21:23:45 2019
 
 SeNet models
 
-adapted from
+adapted from https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
 
-https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
+changed avg_pool to nn.AdaptiveAvgPool2d(1) for image size flexibility
 
 """
 

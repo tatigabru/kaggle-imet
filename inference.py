@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Callable, List
 import numpy as np
 import pandas as pd
-
+from tqdm import tqdm
 import os
 import torch
 from torch import nn, cuda
@@ -36,6 +36,7 @@ from train import args
 
 def main():
     set_seed(args.seed)
+    
     """
         
     SET PARAMS
@@ -45,7 +46,7 @@ def main():
     N_CLASSES = configs.NUM_CLASSES
     DATA_ROOT = configs.DATA_ROOT
     SIZE      = configs.SIZE
-    RUN_ROOT = '../input/seresnext101-folds/' if ON_KAGGLE else '../data/results/'
+    RUN_ROOT = '../input/seresnext101-folds/' if ON_KAGGLE else '../data/seresnext101/'
     args.debug = True
     use_cuda = cuda.is_available()
     use_sample = args.debug
@@ -66,8 +67,9 @@ def main():
         model = model.cuda()
         
     def load_model(model: nn.Module, root: str, fold: int, use_cuda: bool):
-        """Loads model checkpoints
-           Choose evaluation mode
+        """
+        Loads model checkpoints
+        Choose evaluation mode
         """
         best_model_path = root + 'best-metric_fold'+str(fold)+'.pt'
         if use_cuda:
@@ -78,3 +80,56 @@ def main():
         model.load_state_dict(state_dict['model'])
         print('Loaded model from epoch {epoch}, step {step:,}'.format(**state_dict))
         model.eval()
+        
+    """
+
+    MAKE PREDICTIONS
+    
+    """
+    def get_dataloader(df: pd.DataFrame, image_transform, tta: int) -> DataLoader:
+        """
+        Calls dataloader to load Imet Dataset with TTA
+        """
+        return DataLoader(
+            ImetDatasetTTA(test_root, df, image_transform, tta),
+            shuffle=False,
+            batch_size=args.batch_size,
+            num_workers=args.workers,
+            )
+        
+def predict(model: nn.Module, root: Path, predict_df: pd.DataFrame, save_root: str,
+            image_transform, batch_size: int, tta: int, workers: int, use_cuda: bool):
+    """
+    Makes preditions
+    """    
+    
+    test_loader = get_dataloader(predict_df, image_transform, tta)
+    all_outputs, all_ids = [], []        
+    with torch.no_grad():
+        for inputs, ids in tqdm(test_loader, desc='Predict'):
+            if use_cuda:
+                inputs = inputs.cuda()
+            outputs = torch.sigmoid(model(inputs))
+            all_outputs.append(outputs.data.cpu().numpy())
+            all_ids.extend(ids)    
+    
+    df = pd.DataFrame(
+            data=np.concatenate(all_outputs),
+            index=all_ids,
+            columns=map(str, range(N_CLASSES)))
+    df = mean_df(df)
+    print('probs: ', df.head(10)) 
+    return df    
+
+    predict_kwargs = dict(
+            image_transform=test_transform,
+            batch_size=batch_size,
+            tta=2,
+            workers=0,
+            use_cuda=use_cuda
+            )    
+
+ss = pd.read_csv(DATA_ROOT/'sample_submission.csv')
+if use_sample:
+    ss = ss.head(100)     
+print(ss.head())

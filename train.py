@@ -135,7 +135,7 @@ def main():
     prefix = f'{current_time}_{args.model_name}'
     logdir = os.path.join(args.run_root, prefix)
     os.makedirs(logdir, exist_ok=False) 
-        
+       
     print('Train session    :', prefix)  
     print('\tOn KAGGLE      :', ON_KAGGLE)
     print('\tDebug          :', args.debug)
@@ -187,90 +187,6 @@ def main():
     )
     print(runner.callbacks[1].predictions["logits"])
     
-
-
-def validation(
-        model: nn.Module, criterion, valid_loader, use_cuda,
-        ) -> Dict[str, float]:
-    """Model validation
-    Calculates f2 score and accuracy score metrics
-    """
-    model.eval()
-    all_losses, all_predictions, all_targets = [], [], []
-    with torch.no_grad():
-        for inputs, targets in valid_loader:
-            all_targets.append(targets.numpy().copy())
-            if use_cuda:
-                inputs, targets = inputs.cuda(), targets.cuda()
-            outputs = model(inputs)
-            loss = criterion(outputs, targets)
-            all_losses.append(_reduce_loss(loss).item())
-            predictions = torch.sigmoid(outputs)
-            all_predictions.append(predictions.cpu().numpy())
-    all_predictions = np.concatenate(all_predictions)
-    all_targets = np.concatenate(all_targets)
-
-    def get_score(y_pred):
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore', category=UndefinedMetricWarning)
-            return fbeta_score(
-                all_targets, y_pred, beta=2, average='samples')
-
-    def get_acc_score(y_pred):
-        """
-        https://scikit-learn.org/stable/modules/generated/sklearn.metrics.accuracy_score.html
-        """
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore', category=UndefinedMetricWarning)
-            return accuracy_score(
-                all_targets, y_pred, normalize=True)
-
-    metrics = {}
-    argsorted = all_predictions.argsort(axis=1)
-    for threshold in [0.05, 0.1, 0.15, 0.2, 0.25]:
-        metrics[f'valid_f2_th_{threshold:.2f}'] = get_score(
-            binarize_prediction(all_predictions, threshold, argsorted))
-    metrics['valid_loss'] = np.mean(all_losses)
-    print(' | '.join(f'{k} {v:.3f}' for k, v in sorted(
-        metrics.items(), key=lambda kv: -kv[1])))
-   
-    accuracy = {}
-    argsorted = all_predictions.argsort(axis=1)
-    for threshold in [0.3, 0.4, 0.5, 0.6, 0.7]:
-        accuracy[f'acc_score_{threshold:.2f}'] = get_acc_score(
-            binarize_prediction(all_predictions, threshold, argsorted))
-    accuracy['valid_loss'] = np.mean(all_losses)
-    print(' | '.join(f'{k} {v:.3f}' for k, v in sorted(
-        accuracy.items(), key=lambda kv: -kv[1])))
-    return metrics
-
-
-def binarize_prediction(probabilities, threshold: float, argsorted=None,
-                        min_labels=1, max_labels=10):
-    """ 
-    Return matrix of 0/1 predictions, based in probabilities, 
-    same shape as probabilities    
-    """
-    N_CLASSES = configs.NUM_CLASSES
-    assert probabilities.shape[1] == N_CLASSES
-    if argsorted is None:
-        argsorted = probabilities.argsort(axis=1)
-    max_mask = _make_mask(argsorted, max_labels)
-    min_mask = _make_mask(argsorted, min_labels)
-    prob_mask = probabilities > threshold
-    return (max_mask & prob_mask) | min_mask
-
-
-def _make_mask(argsorted, top_n: int):
-    mask = np.zeros_like(argsorted, dtype=np.uint8)
-    col_indices = argsorted[:, -top_n:].reshape(-1)
-    row_indices = [i // top_n for i in range(len(col_indices))]
-    mask[row_indices, col_indices] = 1
-    return mask
-
-
-def _reduce_loss(loss):
-    return loss.sum() / loss.shape[0]  
 
 
 if __name__ == '__main__':
