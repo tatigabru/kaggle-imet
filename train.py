@@ -100,7 +100,7 @@ def main():
             num_workers=num_workers,
             )         
     
-    train_loader = get_dataloader(train_fold, image_transform=valid_transform)
+    train_loader = get_dataloader(train_fold, image_transform=albu_transform)
     valid_loader = get_dataloader(valid_fold, image_transform=valid_transform)
     print('{} items in train, {} in valid'.format(len(train_loader.dataset),len(valid_loader.dataset)))   
     loaders = OrderedDict()

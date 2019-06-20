@@ -31,7 +31,7 @@ from dataset import ImetDatasetTTA
 from transforms import tensor_transform, albu_transform, valid_transform
 from utils import load_model, set_seed, check_fold 
 from senet_models import seresnext101
-from train import args
+
 from catalyst.dl.callbacks import InferCallback, CheckpointCallback
 from catalyst.dl.runner import SupervisedRunner
 
@@ -70,6 +70,19 @@ def _make_mask(argsorted, top_n: int):
 
 
 def main():
+    
+    parser = argparse.ArgumentParser()
+    arg = parser.add_argument   
+    arg('--seed', type=int, default=1234, help='Random seed')
+    arg('--model-name', type=str, default=Path('seresnext101'), help='String model name used for saving')
+    arg('--run-root', type=Path, default=Path('../results'), help='Directory for saving model')
+    arg('--data-root', type=Path, default=Path('../data'))
+    arg('--batch-size', type=int, default=16, help='Batch size during training')      
+    arg('--checkpoint', type=str, default=Path('../results'), help='Checkpoint file path')
+    arg('--workers', type=int, default=2)   
+    arg('--debug', type=bool, default=True)
+    args = parser.parse_args()  
+
     set_seed(args.seed)
     
     """
@@ -80,8 +93,8 @@ def main():
     ON_KAGGLE = configs.ON_KAGGLE
     N_CLASSES = configs.NUM_CLASSES
     DATA_ROOT = configs.DATA_ROOT
-    args.checkpoint = '../input/seresnext101-folds/' if ON_KAGGLE else '../../seresnext101/'
-    args.debug = True
+    args.checkpoint = '../input/seresnext101-folds/' if ON_KAGGLE else '../seresnext101/'
+    args.debug = False
     use_cuda = cuda.is_available()
     use_sample = args.debug
     num_workers = args.workers
@@ -180,13 +193,15 @@ def main():
     
     MAKE SUBMISSION
     
-    """     
+    """  
+    ss = pd.read_csv(DATA_ROOT/'sample_submission.csv')
+    if use_sample:
+        ss = ss.head(100)     
+    print(ss.head())
+
     sample_submission = pd.read_csv(
         DATA_ROOT / 'sample_submission.csv', index_col='id')
-    if use_sample:
-        sample_submission = sample_submission.head(100)     
-    print(sample_submission.head())
-    
+        
     def get_classes(item):
         return ' '.join(cls for cls, is_present in item.items() if is_present)
     
@@ -200,7 +215,7 @@ def main():
     folds = [0, 11, 2, 3, 4]
     for fold in folds:
         load_model(model, args.checkpoint, fold, use_cuda)
-        df = predict(model, test_root, sample_submission, **predict_kwargs)
+        df = predict(model, ss, **predict_kwargs)
         df = df.reindex(sample_submission.index)
         dfs.append(df)
         print(dfs)            
@@ -208,12 +223,37 @@ def main():
     print(df.head())
     # average 5 folds
     df = df.groupby(level=0).mean() 
-    df[:] = binarize_prediction(df.values, threshold=0.11)
+    df[:] = binarize_prediction(df.values, num_classes=N_CLASSES, threshold=0.11)
     df = df.apply(get_classes, axis=1)
     df.name = 'attribute_ids'
     df.to_csv('submission.csv', header=True)
     print(df.head()) 
-    
+
+    all_ids=[]
+    for fold in folds:
+        preds=predict_catalyst(ss, fold, valid_transform, tta=2)
+        for ids in tqdm(test_loader):
+           all_ids.extend(ids)
+
+        df = pd.DataFrame(
+                data=np.concatenate(preds),
+                index=all_ids,
+                columns=map(str, range(N_CLASSES)))
+        df = df.groupby(level=0).mean()  
+        print('probs: ', df.head(10)) 
+        df = df.reindex(sample_submission.index)
+        dfs.append(df)
+        print(dfs)          
+    df = pd.concat(dfs)
+    print(df.head())
+    # average 5 folds
+    df = df.groupby(level=0).mean() 
+    df[:] = binarize_prediction(df.values, num_classes=N_CLASSES, threshold=0.11)
+    df = df.apply(get_classes, axis=1)
+    df.name = 'attribute_ids'
+    df.to_csv('submission2.csv', header=True)
+    print(df.head())
+
     
 
 if __name__ == '__main__':
