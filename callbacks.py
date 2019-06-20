@@ -40,7 +40,7 @@ class F2ScoreCallback(Callback):
               
     def get_metrics(self, probabilities, targets):
         metrics = {}
-        argsorted = probabilities.argsort(axis=1)
+        argsorted = probabilities.argsort()
         for threshold in [0.05, 0.1, 0.15, 0.2, 0.25]:
             y_pred = binarize_prediction(probabilities, threshold, argsorted)
             metrics[f'valid_f2_th_{threshold:.2f}'] = self.get_score(y_pred, targets)
@@ -59,7 +59,7 @@ class F2ScoreCallback(Callback):
         self.reset()    
                 
  
-def binarize_prediction(probabilities: array, num_classes: int, threshold: float, argsorted=None,
+def binarize_prediction(probabilities, num_classes: int, threshold: float, argsorted=None,
                         min_labels=1, max_labels=10):
     """ 
     Return matrix of 0/1 predictions, based in probabilities, 
@@ -91,8 +91,8 @@ def _make_mask(argsorted, top_n: int):
         
 
 def validation(
-        model: nn.Module, criterion, valid_loader, use_cuda,
-        ) -> Dict[str, float]:
+        model: nn.Module, criterion, valid_loader, use_cuda
+        ):
     """Model validation
     Calculates f2 score and accuracy score metrics
     """

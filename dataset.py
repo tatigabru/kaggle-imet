@@ -27,12 +27,14 @@ class ImetDataset(Dataset):
 
     def __getitem__(self, idx: int):
         item = self.df.iloc[idx]
-        image = load_image(item, self.root)        
-        width, height = image.size          
+        image = load_image(item, self.root)         
+        height, width = image.shape[:2]              
                       
-        if self.image_transform is not None:     
-            image = self.image_transform(image)  
-        image.resize((SIZE, SIZE), Image.ANTIALIAS)             
+        if self.image_transform is not None:
+            data = self.image_transform(image=image)
+            image = data['image']                       
+        # resize and transform to tensor  
+        image = cv2.resize(image, (SIZE, SIZE))                    
         image = tensor_transform(image)        
         # labels encoding
         target = torch.zeros(N_CLASSES)
@@ -56,11 +58,12 @@ class ImetDatasetTTA(Dataset):
     def __getitem__(self, idx):
         item = self.df.iloc[idx % len(self.df)]
         image = load_image(item, self.root)        
-        width, height = image.size        
+        height, width = image.shape[:2]        
                 
         if self.image_transform is not None:     
-            image = self.image_transform(image)              
-        image.resize((SIZE, SIZE), Image.ANTIALIAS)
+            data = self.image_transform(image=image)
+            image = data['image']              
+        image = cv2.resize(image, (SIZE, SIZE))  
         image = tensor_transform(image)             
         return image, item.id
 
@@ -68,4 +71,4 @@ class ImetDatasetTTA(Dataset):
 def load_image(item, root: Path) -> Image.Image:
     image = cv2.imread(str(root / f'{item.id}.png'))
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    return Image.fromarray(image)
+    return image

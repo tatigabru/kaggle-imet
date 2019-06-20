@@ -28,7 +28,7 @@ from torchvision.transforms import (
     RandomHorizontalFlip, RandomGrayscale)
 
 from dataset import ImetDatasetTTA
-from transforms import tensor_transform, train_transform, test_transform, albu_transform, valid_transform
+from transforms import tensor_transform, albu_transform, valid_transform
 from utils import load_model, set_seed, check_fold 
 from senet_models import seresnext101
 from train import args
@@ -191,7 +191,7 @@ def main():
         return ' '.join(cls for cls, is_present in item.items() if is_present)
     
     predict_kwargs = dict(
-            image_transform=test_transform,            
+            image_transform=valid_transform,            
             tta=2,
             use_cuda=use_cuda
             )   

@@ -9,21 +9,18 @@ import argparse
 import os
 from pathlib import Path
 import warnings
-from typing import Dict
 import numpy as np
 import pandas as pd
-from sklearn.metrics import fbeta_score, accuracy_score
-from sklearn.exceptions import UndefinedMetricWarning
 from collections import OrderedDict
+from datetime import datetime
 
 import torch
 from torch import nn, cuda
 from torch.optim import Adam, lr_scheduler
 from torch.utils.data import DataLoader
-from datetime import datetime
 
 from dataset import ImetDataset
-from transforms import tensor_transform, train_transform, test_transform, albu_transform, valid_transform
+from transforms import tensor_transform, albu_transform, valid_transform
 from utils import load_model, set_seed, check_fold 
 from senet_models import seresnext101
 
@@ -31,6 +28,7 @@ from catalyst.dl.runner import SupervisedRunner
 from catalyst.dl.callbacks import InferCallback
 from catalyst.dl.callbacks import EarlyStoppingCallback, F1ScoreCallback, CheckpointCallback
 from callbacks import F2ScoreCallback
+
 
 
 def main():
@@ -51,7 +49,7 @@ def main():
     arg('--criterion', type=str, default='bce', help='Criterion')
     arg('--optimizer', default='Adam', help='Name of the optimizer')    
     arg('--continue_train', type=bool, default=False)   
-    arg('--checkpoint', type=str, default=Path('../results'), help='Checkpoints root path')
+    arg('--checkpoint', type=str, default=Path('../results'), help='Checkpoint file path')
     arg('--workers', type=int, default=2)   
     arg('--debug', type=bool, default=True)
     args = parser.parse_args() 
@@ -102,8 +100,8 @@ def main():
             num_workers=num_workers,
             )         
     
-    train_loader = get_dataloader(train_fold, image_transform=train_transform)
-    valid_loader = get_dataloader(valid_fold, image_transform=test_transform)
+    train_loader = get_dataloader(train_fold, image_transform=valid_transform)
+    valid_loader = get_dataloader(valid_fold, image_transform=valid_transform)
     print('{} items in train, {} in valid'.format(len(train_loader.dataset),len(valid_loader.dataset)))   
     loaders = OrderedDict()
     loaders["train"] = train_loader
@@ -128,18 +126,17 @@ def main():
     
     """
     # call an instance of the model runner
-    runner = SupervisedRunner()
-    
+    runner = SupervisedRunner()    
     # logs folder
     current_time = datetime.now().strftime('%b%d_%H_%M')
     prefix = f'{current_time}_{args.model_name}'
     logdir = os.path.join(args.run_root, prefix)
     os.makedirs(logdir, exist_ok=False) 
        
-    print('Train session    :', prefix)  
+    print('\tTrain session    :', prefix)  
     print('\tOn KAGGLE      :', ON_KAGGLE)
     print('\tDebug          :', args.debug)
-    print('\tClasses nember :', N_CLASSES)
+    print('\tClasses number :', N_CLASSES)
     print('\tModel          :', args.model_name)
     print('\tParameters     :', model.parameters())
     print('\tImage size     :', args.image_size)
@@ -165,6 +162,7 @@ def main():
         loaders=loaders,
         callbacks=[        
         F1ScoreCallback(threshold=0.5),
+        #F2ScoreCallback(num_classes=N_CLASSES),
         EarlyStoppingCallback(patience=args.patience, min_delta=0.01)
         ],
         logdir=logdir,
@@ -174,7 +172,11 @@ def main():
     
     # by default it only plots loss, works in IPython Notebooks    
     #utils.plot_metrics(logdir=logdir, metrics=["loss", "_base/lr"])  
-
+    """
+    
+    INFERENCE TEST
+    
+    """
     loaders = OrderedDict([("infer", loaders["train"])])
     runner.infer(
         model=model,

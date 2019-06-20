@@ -1,14 +1,18 @@
 from datetime import datetime
 import json
+import glob
 import os
 from pathlib import Path
 from typing import Dict
 import random
 from collections import Counter
+
 import numpy as np
 import pandas as pd
+from scipy.stats.mstats import gmean
 import torch
 from torch import nn, cuda
+
 
 
 def unzip(path_to_zip_file):
@@ -32,7 +36,6 @@ def set_seed(seed=1234):
     
 
 def load_model(model: nn.Module, path: Path) -> Dict:
-    """Loads saved chackpoint"""
     state = torch.load(str(path))
     model.load_state_dict(state['model'])
     print('Loaded model from epoch {epoch}, step {step:,}'.format(**state))
@@ -45,10 +48,10 @@ def check_fold(train_fold: pd.DataFrame, valid_fold: pd.DataFrame):
     : train_fold : dataframe with train meta
     : valid_fold : dataframe with validation meta
     """
-    cls_counts = Counter(cls for classes in train_fold['Attributes'].str.split()
+    cls_counts = Counter(cls for classes in train_fold['attribute_ids'].str.split()
                          for cls in classes)   
     print('train_fold counts :', cls_counts)
-    cls_counts = Counter(cls for classes in valid_fold['Attributes'].str.split()
+    cls_counts = Counter(cls for classes in valid_fold['attribute_ids'].str.split()
                         for cls in classes) 
     print('valid_fold counts :', cls_counts)
 
