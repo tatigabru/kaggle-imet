@@ -8,32 +8,18 @@ Inference, make predictions and submit
 import configs
 import argparse
 from pathlib import Path
-from typing import Callable, List
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import os
 import torch
 from torch import nn, cuda
-from torch.nn import functional as F
-import torchvision.models as M
 from torch.utils.data import DataLoader
-from torch.utils.data import Dataset 
-from collections import Counter, OrderedDict
-    
-import cv2
-from PIL import Image
-from torchvision.transforms import (
-    ToTensor, Normalize, Compose, Resize, CenterCrop, RandomCrop,
-    RandomHorizontalFlip, RandomGrayscale)
 
 from dataset import ImetDatasetTTA
 from transforms import tensor_transform, albu_transform, valid_transform
-from utils import load_model, set_seed, check_fold 
+from utils import set_seed
 from senet_models import seresnext101
-
-from catalyst.dl.callbacks import InferCallback, CheckpointCallback
-from catalyst.dl.runner import SupervisedRunner
 
 
 
